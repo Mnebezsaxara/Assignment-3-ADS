@@ -1,11 +1,13 @@
 import java.util.*;
 
-public class BST<K extends Comparable<K>, V> implements Iterable<K>{
+public class BST<K extends Comparable<K>, V> implements Iterable<BST.Entry<K, V>>{
     private Node root;
-    private class Node {
+    private int size;
+
+    private static class Node<K, V> {
         private K key;
         private V val;
-        private Node left, right;
+        private Node<K, V> left, right;
 
         public Node(K key, V val) {
             this.key = key;
@@ -15,22 +17,25 @@ public class BST<K extends Comparable<K>, V> implements Iterable<K>{
 
     public void put(K key, V val) {
         root = put(root, key, val);
+        size++;
     }
 
-    public Iterator<K> iterator() {
+    public Iterator<BST.Entry<K, V>> iterator() {
         return new BSTIterator(root);
     }
 
-    private class BSTIterator implements Iterator<K> {
-        private Node current;
-        private Stack<Node> stack;
+    private class BSTIterator implements Iterator<BST.Entry<K, V>> {
+        private Stack<Node<K, V>> stack;
 
-        public BSTIterator(Node root) {
-            current = root;
+        public BSTIterator(Node<K, V> root) {
             stack = new Stack<>();
-            while (current != null) {
-                stack.push(current);
-                current = current.left;
+            pushLeft(root);
+        }
+
+        private void pushLeft(Node<K, V> node) {
+            while (node != null) {
+                stack.push(node);
+                node = node.left;
             }
         }
 
@@ -40,23 +45,16 @@ public class BST<K extends Comparable<K>, V> implements Iterable<K>{
         }
 
         @Override
-        public K next() {
+        public BST.Entry<K, V> next() {
             if (!hasNext()) throw new NoSuchElementException();
-            Node node = stack.pop();
-            K key = node.key;
-            if (node.right != null) {
-                node = node.right;
-                while (node != null) {
-                    stack.push(node);
-                    node = node.left;
-                }
-            }
-            return key;
+            Node<K, V> node = stack.pop();
+            pushLeft(node.right);
+            return new BST.Entry<>(node.key, node.val);
         }
     }
 
-    private Node put(Node x, K key, V val) {
-        if (x == null) return new Node(key, val);
+    private Node<K, V> put(Node<K, V> x, K key, V val) {
+        if (x == null) return new Node<>(key, val);
         int cmp = key.compareTo(x.key);
         if (cmp < 0) x.left = put(x.left, key, val);
         else if (cmp > 0) x.right = put(x.right, key, val);
@@ -65,7 +63,7 @@ public class BST<K extends Comparable<K>, V> implements Iterable<K>{
     }
 
     public V get(K key) {
-        Node x = root;
+        Node<K, V> x = root;
         while (x != null) {
             int cmp = key.compareTo(x.key);
             if (cmp < 0) x = x.left;
@@ -77,9 +75,10 @@ public class BST<K extends Comparable<K>, V> implements Iterable<K>{
 
     public void delete(K key) {
         root = delete(root, key);
+        size--;
     }
 
-    private Node delete(Node x, K key) {
+    private Node<K, V> delete(Node<K, V> x, K key) {
         if (x == null) return null;
         int cmp = key.compareTo(x.key);
         if (cmp < 0) x.left = delete(x.left, key);
@@ -87,7 +86,7 @@ public class BST<K extends Comparable<K>, V> implements Iterable<K>{
         else {
             if (x.right == null) return x.left;
             if (x.left == null) return x.right;
-            Node t = x;
+            Node<K, V> t = x;
             x = min(t.right);
             x.right = deleteMin(t.right);
             x.left = t.left;
@@ -95,12 +94,12 @@ public class BST<K extends Comparable<K>, V> implements Iterable<K>{
         return x;
     }
 
-    private Node min(Node x) {
+    private Node<K, V> min(Node<K, V> x) {
         if (x.left == null) return x;
         return min(x.left);
     }
 
-    private Node deleteMin(Node x) {
+    private Node<K, V> deleteMin(Node<K, V> x) {
         if (x.left == null) return x.right;
         x.left = deleteMin(x.left);
         return x;
@@ -108,37 +107,25 @@ public class BST<K extends Comparable<K>, V> implements Iterable<K>{
 
     public Iterable<K> keys() {
         List<K> keys = new ArrayList<>();
-        inorder(root, keys);
+        Stack<Node<K, V>> stack = new Stack<>();
+        Node<K, V> current = root;
+
+        while (current != null || !stack.isEmpty()) {
+            while (current != null) {
+                stack.push(current);
+                current = current.left;
+            }
+
+            current = stack.pop();
+            keys.add(current.key);
+            current = current.right;
+        }
+
         return keys;
     }
 
-    private void inorder(Node x, List<K> keys) {
-        if (x == null) return;
-        inorder(x.left, keys);
-        keys.add(x.key);
-        inorder(x.right, keys);
-    }
-
     public int size() {
-        return size(root);
-    }
-
-    private int size(Node x) {
-        if (x == null) return 0;
-        return 1 + size(x.left) + size(x.right);
-    }
-
-    public Iterable<Entry<K, V>> entries() {
-        List<Entry<K, V>> entries = new ArrayList<>();
-        inorderEntries(root, entries);
-        return entries;
-    }
-
-    private void inorderEntries(Node x, List<Entry<K, V>> entries) {
-        if (x == null) return;
-        inorderEntries(x.left, entries);
-        entries.add(new Entry<>(x.key, x.val));
-        inorderEntries(x.right, entries);
+        return size;
     }
 
     public static class Entry<K, V> {
@@ -172,8 +159,8 @@ public class BST<K extends Comparable<K>, V> implements Iterable<K>{
         System.out.println("Size: " + bst.size());
 
         System.out.println("In-order traversal:");
-        for (Integer key : bst) {
-            System.out.println("Key is " + key + " and value is " + bst.get(key));
+        for (BST.Entry<Integer, String> entry : bst) {
+            System.out.println("Key is " + entry.getKey() + " and value is " + entry.getValue());
         }
     }
 }
